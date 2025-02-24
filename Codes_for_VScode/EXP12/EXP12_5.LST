@@ -1,0 +1,230 @@
+ The Microsoft MACRO Assembler , Version 1.27          	Page	1-1
+	 	 	 	 	 	 	 	06-01-<4    
+
+
+ 0000	 	 	 	DATA    SEGMENT                                
+	 	 	 	     ;定义数据段
+ 0000  0A 0D 49 43 45 20	SHOW DB  0AH,0DH, 'ICE CREAM AND TEA:$'        
+	 	 	 	     ;0AH,0DH为换行，回车
+       43 52 45 41 4D 20	
+       41 4E 44 20 54 45	
+       41 3A 24	 	 	
+ 0015  0294 0310 0001 0310	FREQ 	DW  660,784,1,784,880,784,660,524,1,524
+	 	 	 	,588	;查表可得频率,1为休止符
+       0370 0310 0294 020C	
+       0001 020C 024C	 	
+ 002B  0294 0001 0294 024C	        DW  660,1,660,588,524,588,1
+       020C 024C 0001	 	
+ 0039  0294 0310 0001 0310	        DW  660,784,1,784,880,784,660,524,1,524
+	 	 	 	,588
+       0370 0310 0294 020C	
+       0001 020C 024C	 	
+ 004F  0294 0001 0294 024C	        DW  660,1,660,588,1,588,524,0
+       0001 024C 020C 0000	
+ 	 	 	 	
+ 005F  0032 0032 0005 004B	TIME	DW  50,50,5,75,25,50,50,50,5,25,25     
+	 	 	 	     ;多少个10ms
+       0019 0032 0032 0032	
+       0005 0019 0019	 	
+ 0075  0032 0005 0032 0032	        DW  50,5,50,50,50,200,5
+       0032 00C8 0005	 	
+ 0083  0032 0032 0005 004B	        DW  50,50,5,75,25,50,50,50,5,25,25
+       0019 0032 0032 0032	
+       0005 0019 0019	 	
+ 0099  0032 0005 0032 0032	        DW  50,5,50,50,5,50,200,0
+       0005 0032 00C8 0000	
+ 00A9	 	 	 	DATA    ENDS
+ 	 	 	 	
+ 	 	 	 	
+ 0000	 	 	 	STACK   SEGMENT PARA STACK 'STACK'             
+	 	 	 	      ;定义堆栈段
+ 0000     C8 [	 	 	        DW  200 DUP(?)
+                ????	 	
+                      ]	 	
+ 	 	 	 	
+ 0190	 	 	 	STACK   ENDS
+ 	 	 	 	
+ 0000	 	 	 	CODE    SEGMENT
+ 	 	 	 	 	ASSUME  CS:CODE, DS:DATA,SS:STACK
+ 	 	 	 	
+ 0000	 	 	 	START:
+ 0000  B8 ---- R	 	 	MOV AX,DATA
+ 0003  8E D8	 	 	 	MOV DS,AX	 	               
+	 	 	 	 ;初始化数据段
+ 0005  B8 ---- R	 	 	MOV AX,STACK	 	
+ 0008  8E D0	 	 	 	MOV SS,AX	 	               
+	 	 	 	 ;初始化堆栈段
+ 000A  BA 0000 R	 	 	MOV DX,OFFSET SHOW
+ The Microsoft MACRO Assembler , Version 1.27          	Page	1-2
+	 	 	 	 	 	 	 	06-01-<4    
+
+
+ 000D  B4 09	 	 	 	MOV AH,09
+ 000F  CD 21	 	 	 	INT 21H 	 	 	       
+	 	 	 	     ;显示提示信息
+ 0011  BE 0015 R	 	 	MOV SI,OFFSET FREQ	            ;�
+	 	 	 	�频率数据地址给SI
+ 0014  BD 005F R	 	 	MOV BP,OFFSET TIME	            ;�
+	 	 	 	�节拍时间数据的地址给BP
+ 0017  E8 001E R	 	 	CALL SING
+ 001A  B4 4C	 	 	 	MOV AH,4CH
+ 001C  CD 21	 	 	 	INT 21H	 	 	               
+	 	 	 	 ;程序结束，返回DOS
+ 	 	 	 	
+ 001E	 	 	 	SING PROC NEAR  
+ 001E  57	 	 	        PUSH DI
+ 001F  56	 	 	        PUSH SI
+ 0020  55	 	 	        PUSH BP
+ 0021  53	 	 	        PUSH BX
+ 0022  8B 3C	 	 	RETP:  	MOV DI,DS:[SI]	 	        ;取频
+	 	 	 	率给DI
+ 0024  83 FF 00	 	 	        CMP DI,0        	 	    ;0�
+	 	 	 	��味着程序结束
+ 0027  74 0F	 	 	        JE END_SING	 	
+ 0029  3E: 8B 5E 00	 	 	    MOV BX,DS:[BP]	 	       
+	 	 	 	 ;取节拍给BX
+ 002D  E8 003D R	 	        CALL SOUND         	 	    ;�
+	 	 	 	�数为DI和BX
+ 0030  83 C6 02	 	 	        ADD SI,2
+ 0033  83 C5 02	 	 	        ADD BP,2
+ 0036  EB EA	 	 	        JMP RETP
+ 0038	 	 	 	END_SING:
+ 0038  5B	 	 	 	 	POP  BX
+ 0039  5D	 	 	        POP  BP
+ 003A  5E	 	 	      	POP  SI
+ 003B  5F	 	 	        POP  DI
+ 003C  C3	 	 	        RET
+ 003D	 	 	 	SING ENDP
+ 	 	 	 	
+ 003D	 	 	 	SOUND PROC  NEAR
+ 003D  50	 	 	        PUSH AX
+ 003E  53	 	 	       	PUSH BX          	 	    ;BX
+	 	 	 	节拍时间数据
+ 003F  51	 	 	        PUSH CX
+ 0040  52	 	 	       	PUSH DX
+ 0041  57	 	 	        PUSH DI           	 	    ;DI
+	 	 	 	给定频率数据
+ 0042  B0 B6	 	 	        MOV AL,10110110B     	    ;8253初始
+	 	 	 	化(通道2，方式3，产生方波信号)
+ 0044  E6 43	 	 	        OUT 43H,AL      	 	    ;43
+	 	 	 	H端口是8253的命令寄存器
+ 	 	 	 	
+ 0046  83 FF 01	 	 	 	    CMP DI,1                    ;判断
+	 	 	 	是否为休止符
+ 0049  74 16	 	 	 	    JE DELAY
+ The Microsoft MACRO Assembler , Version 1.27          	Page	1-3
+	 	 	 	 	 	 	 	06-01-<4    
+
+
+ 	 	 	 	
+ 004B  BA 0012	 	 	        MOV DX,12H      	 	    ;�
+	 	 	 	�算折算频率（时间常数）
+ 004E  B8 34DC	 	 	        MOV AX,34DCH                ;1234CDH除
+	 	 	 	以给定频率
+ 0051  F7 F7	 	 	        DIV DI
+ 	 	 	 	
+ 0053  E6 42	 	 	        OUT 42H,AL      	 	    ;�
+	 	 	 	�8253通道2设置计数初值（先写低字�
+	 	 	 	�，再写高字节）
+ 0055  8A C4	 	 	        MOV AL,AH
+ 0057  E6 42	 	 	        OUT 42H,AL
+ 	 	 	 	
+ 0059  E4 61	 	 	        IN  AL,61H  	 	        ;读825
+	 	 	 	5B口
+ 005B  8A E0	 	 	        MOV AH,AL
+ 005D  0C 03	 	 	        OR  AL,3       	 	        ;8255�
+	 	 	 	�—PB1PB0置1，开喇叭
+ 005F  E6 61	 	 	        OUT 61H,AL
+ 0061	 	 	 	DELAY:
+ 0061  E8 0071 R	 	  	CALL DELAYS  
+ 0064  4B	 	 	 	DEC BX	 	 	        ;BX—�
+	 	 	 	��拍时间对应10ms的倍数，如:BX=100,节
+	 	 	 	拍时间=10ms*100=1s
+ 0065  75 FA	 	 	    JNZ  DELAY
+ 0067  8A C4	 	 	    MOV   AL,AH
+ 0069  E6 61	 	 	    OUT   61H,AL       	 	        ;8255�
+	 	 	 	�—PB1PB0恢复为零，关喇叭
+ 006B  5F	 	 	    POP DI
+ 006C  5A	 	 	    POP DX
+ 006D  59	 	 	    POP CX
+ 006E  5B	 	 	    POP BX
+ 006F  58	 	 	    POP AX
+ 0070  C3	 	 	    RET
+ 0071	 	 	 	SOUND   ENDP
+ 	 	 	 	
+ 0071	 	 	 	DELAYS	PROC	NEAR
+ 	 	 	 	        ;压栈
+ 0071  52	 	 	 	    PUSH DX
+ 0072  51	 	 	 	    PUSH CX
+ 0073  53	 	 	            PUSH BX
+ 0074  50	 	 	 	    PUSH AX
+ 	 	 	 	        ;中断调用延时
+ 0075  B4 2C	 	 	 	    MOV AH, 2CH
+ 0077  CD 21	 	 	 	    INT 21H	;DOS调用系统时间
+ 0079  8A DA	 	 	 	    MOV BL, DL	;存储当前1/100秒�
+	 	 	 	�
+ 007B  8A FE	 	 	            MOV BH, DH
+ 007D  FE C7	 	 	            INC BH
+ 007F  FE C3	 	 	            INC BL
+ 0081	 	 	 	DELAY_BEGIN:
+ 0081  B4 2C	 	 	            MOV AH, 2CH
+ 0083  CD 21	 	 	 	    INT 21H	;调用系统时间
+ The Microsoft MACRO Assembler , Version 1.27          	Page	1-4
+	 	 	 	 	 	 	 	06-01-<4    
+
+
+ 0085  3A FE	 	 	 	    CMP BH, DH	;比较当前时间与�
+	 	 	 	��次调用的秒是否变化
+ 0087  75 06	 	 	 	    JNE DELAY_NEXT	;若有变化�
+	 	 	 	�则完成延时，退出程序
+ 0089  3A DA	 	 	            CMP BL, DL	;比较当前时间与�
+	 	 	 	��次调用的百分秒是否变化
+ 008B  73 02	 	 	 	    JAE DELAY_NEXT	;若，则完�
+	 	 	 	�延时，退出程序
+ 008D  EB F2	 	 	 	    JMP DELAY_BEGIN	;若无变化�
+	 	 	 	�则继续调用系统时间
+ 008F	 	 	 	DELAY_NEXT:
+ 	 	 	 	        ;弹出
+ 008F  58	 	 	 	    POP AX
+ 0090  5B	 	 	            POP BX
+ 0091  59	 	 	 	    POP CX
+ 0092  5A	 	 	 	    POP DX
+ 0093  C3	 	 	 	    RET
+ 0094	 	 	 	DELAYS	ENDP
+ 	 	 	 	
+ 0094	 	 	 	CODE ENDS
+ 	 	 	 	END START 
+
+ The Microsoft MACRO Assembler , Version 1.27          	Page	Symbols
+	 	 	 	-1
+	 	 	 	 	 	 	 	06-01-<4    
+
+
+Segments and groups:
+
+	 	N a m e	 	 	Size	align	combine	class
+
+CODE . . . . . . . . . . . . . .	0094	PARA  	NONE	
+DATA . . . . . . . . . . . . . .	00A9	PARA  	NONE	
+STACK. . . . . . . . . . . . . .	0190	PARA  	STACK 	'STACK'
+
+Symbols:            
+
+	 	N a m e	 	 	Type	Value	Attr         
+
+DELAY. . . . . . . . . . . . . .	L NEAR 	0061	CODE
+DELAYS . . . . . . . . . . . . .	N PROC	0071	CODE	Length =0023
+DELAY_BEGIN. . . . . . . . . . .	L NEAR 	0081	CODE
+DELAY_NEXT . . . . . . . . . . .	L NEAR 	008F	CODE
+END_SING . . . . . . . . . . . .	L NEAR 	0038	CODE
+FREQ . . . . . . . . . . . . . .	L WORD 	0015	DATA
+RETP . . . . . . . . . . . . . .	L NEAR 	0022	CODE
+SHOW . . . . . . . . . . . . . .	L BYTE 	0000	DATA
+SING . . . . . . . . . . . . . .	N PROC	001E	CODE	Length =001F
+SOUND. . . . . . . . . . . . . .	N PROC	003D	CODE	Length =0034
+START. . . . . . . . . . . . . .	L NEAR 	0000	CODE
+TIME . . . . . . . . . . . . . .	L WORD 	005F	DATA
+
+Warning Severe
+Errors	Errors 
+0	0

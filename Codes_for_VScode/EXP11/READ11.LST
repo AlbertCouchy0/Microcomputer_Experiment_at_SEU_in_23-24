@@ -1,0 +1,697 @@
+ The Microsoft MACRO Assembler , Version 1.27          	Page	1-1
+	 	 	 	 	 	 	 	05-15-<4    
+
+
+ 0000	 	 	 	DATA SEGMENT
+ 	 	 	 	 	;提示消息
+ 0000  ?? ?? 2D 4D 41 4B	 	MSG1    DB 	?,?,'-MAKA BAKA';字符
+	 	 	 	串1
+       41 20 42 41 4B 41	
+ = 000C	 	 	 	 	SLENGTH1 EQU 	$-MSG1
+ 000C  ?? ?? 2D 57 55 58	 	MSG2    DB 	?,?,'-WUXI DIXI';字符
+	 	 	 	串2
+       49 20 44 49 58 49	
+ = 000C	 	 	 	 	SLENGTH2 EQU	$-MSG2
+ 	 	 	 	 	;计数器
+ 0018  00	 	 	 	COUNT   DB 0        
+ 0019  00	 	 	 	CLOCK   DB 0	
+ 001A  00	 	 	 	KEYN    DB 0
+ 	 	 	 	 	;计数上限
+ = 000C	 	 	 	 	LIM1 	EQU 12D	 	;键盘中断�
+	 	 	 	�数上限
+ = 000C	 	 	 	 	LIM2 	EQU 12D	 	;定时中断�
+	 	 	 	�数上限
+ 001B  19	 	 	 	LINE    DB 25       ;最大显示行数
+ 	 	 	 	    ;输入时间并检验
+ 001C  03	 	 	    TIME 	DB  3       ;缓冲区
+ 001D  ??	 	 	 	        DB  ?;
+ 001E     03 [	 	 	            DB 3  DUP(?);	
+                ??	 	
+                    ]	 	
+ 	 	 	 	
+ 0021  0A	 	 	    T       DB 10       ;输入时间的数值
+ 0022  12	 	 	 	N 	 	DB 18       ;转换为�
+	 	 	 	��数次数
+ 0023  50 6C 65 61 73 65	    TXT1    DB "Please input TIME in units of 0
+	 	 	 	.1s(5<=TIME<=50):$"  ;文本提示1
+       20 69 6E 70 75 74	
+       20 54 49 4D 45 20	
+       69 6E 20 75 6E 69	
+       74 73 20 6F 66 20	
+       30 2E 31 73 28 35	
+       3C 3D 54 49 4D 45	
+       3C 3D 35 30 29 3A	
+       24	 	 	
+ 0054  0D 0A 57 72 6F 6E	    ERROR0  DB 0DH,0AH,'Wrong Input Format!',0A
+	 	 	 	H,'$'                ;错误提示0
+       67 20 49 6E 70 75	
+       74 20 46 6F 72 6D	
+       61 74 21 0A 24	 	
+ 006B  0D 0A 54 68 65 20	    ERROR1  DB 0DH,0AH,'The Input is too small!
+	 	 	 	',0AH,'$'            ;错误提示1       
+       49 6E 70 75 74 20	
+       69 73 20 74 6F 6F	
+       20 73 6D 61 6C 6C	
+       21 0A 24	 	 	
+ 0086  0D 0A 54 68 65 20	    ERROR2  DB 0DH,0AH,'The Input is too big!',
+	 	 	 	0AH,'$'              ;错误提示2     
+ The Microsoft MACRO Assembler , Version 1.27          	Page	1-2
+	 	 	 	 	 	 	 	05-15-<4    
+
+
+       49 6E 70 75 74 20	
+       69 73 20 74 6F 6F	
+       20 62 69 67 21 0A	
+       24	 	 	
+ 009F	 	 	 	DATA ENDS
+ 	 	 	 	
+ 0000	 	 	 	STACK SEGMENT STACK
+ 0000  0300 [	 	 	 	DW 300H DUP(?)
+                ????	 	
+                      ]	 	
+ 	 	 	 	
+ 0600	 	 	 	STACK ENDS
+ 	 	 	 	
+ 0000	 	 	 	CODE SEGMENT
+ 	 	 	 	 	ASSUME CS:CODE,SS:STACK,DS:DATA
+ 0000	 	 	 	START:
+ 	 	 	 	;给段寄存器赋值
+ 0000  B8 ---- R	 	 	MOV AX,STACK
+ 0003  8E D0	 	 	 	MOV SS,AX
+ 0005  B8 ---- R	 	 	MOV AX,DATA
+ 0008  8E D8	 	 	 	MOV DS,AX
+ 000A  B8 0000	 	 	 	MOV AX,0
+ 000D  8E C0	 	 	 	MOV ES,AX	
+ 	 	 	 	;输出提示文本
+ 000F  8D 36 0023 R	 	    LEA SI,TXT1         ;取TXT1地址
+ 0013  8B D6	 	 	    MOV DX,SI           ;赋值地址给DX
+ 0015  B4 09	 	 	    MOV AH,09	 	 	;功能号09H
+ 0017  CD 21	 	 	    INT 21H    	 	 	;类型号21H�
+	 	 	 	�显示DS：DX指向的以$结尾的字符串
+ 	 	 	 	;输入TIME
+ 0019  8D 36 001C R	 	    LEA SI,TIME;
+ 001D  8B D6	 	 	    MOV DX,SI           ;赋值地址给DX
+ 001F  B4 0A	 	 	    MOV  AH, 0AH;	
+ 0021  CD 21	 	 	 	INT  21H            ;输入
+ 	 	 	 	;检验
+ 0023  E8 00BB R	 	    CALL  INPUTerror    ;判断输入格式是�
+	 	 	 	��错误
+ 0026  E8 00E7 R	 	    CALL  ASCtoNUM      ;把缓存区ASCII码�
+	 	 	 	�换成NUM
+ 0029  E8 0108 R	 	 	CALL  VALUEerror    ;判断时间是否
+	 	 	 	在范围内	
+ 	 	 	 	;将时间转换为计数次数储存
+ 002C  56	 	 	        PUSH SI
+ 002D  50	 	 	        PUSH AX
+ 002E  53	 	 	        PUSH BX
+ 	 	 	 	
+ 002F  8D 36 0021 R	 	 	    LEA SI,T        ;取T首地址
+ 0033  2B C0	 	 	        SUB AX,AX;
+ 0035  8A 04	 	 	 	    MOV AL,[SI];
+ 0037  B3 64	 	 	 	    MOV BL,100D
+ 0039  F6 E3	 	 	 	    MUL BL;
+ 003B  B3 37	 	 	 	    MOV BL,55D
+ 003D  F6 F3	 	 	 	    DIV BL;
+ The Microsoft MACRO Assembler , Version 1.27          	Page	1-3
+	 	 	 	 	 	 	 	05-15-<4    
+
+
+ 003F  8D 36 0022 R	 	 	    LEA SI,N        ;取N首地址
+ 0043  88 04	 	 	 	    MOV [SI],AL
+ 	 	 	 	
+ 0045  5B	 	 	        POP BX
+ 0046  58	 	 	        POP AX
+ 0047  5E	 	 	 	    POP SI
+ 	 	 	 	;清空各寄存器
+ 0048  2B C0	 	 	    SUB AX,AX;
+ 004A  2B DB	 	 	    SUB BX,BX;
+ 004C  2B C9	 	 	    SUB CX,CX;
+ 004E  2B D2	 	 	    SUB DX,DX;
+ 0050  2B F6	 	 	    SUB SI,SI;
+ 0052  2B FF	 	 	    SUB DI,DI;
+ 	 	 	 	;保存原1CH中断向量
+ 0054  26: A1 0070	 	 	MOV AX,ES:[1CH*4]
+ 0058  50	 	 	 	PUSH AX
+ 0059  26: A1 0072	 	 	MOV AX,ES:[1CH*4+2]
+ 005D  50	 	 	 	PUSH AX
+ 	 	 	 	;置1CH中断向量
+ 005E  FA	 	 	 	CLI
+ 005F  B8 022B R	 	 	MOV AX,OFFSET TIMERINTS
+ 0062  26: A3 0070	 	 	MOV ES:[1CH*4],AX
+ 0066  B8 ---- R	 	 	MOV AX,SEG TIMERINTS
+ 0069  26: A3 0072	 	 	MOV ES:[1CH*4+2],AX
+ 006D  FB	 	 	 	STI
+ 	 	 	 	;保存原09H的中断
+ 006E  26: A1 0024	 	 	MOV AX,ES:[09H*4]
+ 0072  50	 	 	 	PUSH AX
+ 0073  26: A1 0026	 	 	MOV AX,ES:[09H*4+2]
+ 0077  50	 	 	 	PUSH AX
+ 0078  1E	 	 	 	PUSH DS
+ 	 	 	 	;置09H中断向量
+ 0079  FA	 	 	 	CLI
+ 007A  B8 ---- R	 	 	MOV	AX, SEG KEYINT
+ 007D  8E D8	 	 	 	MOV	DS, AX
+ 007F  BA 0252 R	 	 	MOV	DX, OFFSET KEYINT
+ 0082  B0 09	 	 	 	MOV	AL, 09H	 	 	
+ 	 	 	 	 	
+ 0084  B4 25	 	 	 	MOV	AH, 25H
+ 0086  CD 21	 	 	 	INT	21H
+ 0088  FB	 	 	 	STI
+ 	 	 	 	
+ 0089  1F	 	 	 	POP DS;
+ 	 	 	 	;调用DISP1显示太阳
+ 008A	 	 	 	AGAIN:
+ 008A  9A 012A ---- R	 	 	CALL FAR PTR DISP1
+ 008F  80 3E 001A R 0C	 	 	CMP KEYN,LIM1       ;与LIM1比较
+ 0094  73 09	 	 	 	JAE NEXT
+ 0096  80 3E 0019 R 0C	 	 	CMP CLOCK,LIM2      ;与LIM2比较
+ 009B  73 02	 	 	 	JAE NEXT
+ 009D  EB EB	 	 	 	JMP AGAIN
+ 009F	 	 	 	NEXT:
+ 	 	 	 	;恢复09H中断	
+ The Microsoft MACRO Assembler , Version 1.27          	Page	1-4
+	 	 	 	 	 	 	 	05-15-<4    
+
+
+ 009F  FA	 	 	 	CLI
+ 00A0  26: 8F 06 0026	 	 	POP ES:[09H*4+2]
+ 00A5  26: 8F 06 0024	 	 	POP ES:[09H*4]
+ 00AA  FB	 	 	 	STI
+ 	 	 	 	;恢复1CH向量
+ 00AB  FA	 	 	 	CLI
+ 00AC  26: 8F 06 0072	 	 	POP ES:[1CH*4+2]
+ 00B1  26: 8F 06 0070	 	 	POP ES:[1CH*4]
+ 00B6  FB	 	 	 	STI
+ 00B7	 	 	 	EXIT:
+ 00B7  B4 4C	 	 	 	MOV AH,4CH
+ 00B9  CD 21	 	 	 	INT 21H
+ 	 	 	 	;;;;;;;;;;;;;;;;;;;;;子程序区;;;;;;;;;;;;;;
+	 	 	 	;;;;;;;;;
+ 	 	 	 	;———————————————�
+	 	 	 	��——INPUTerror子程序——————�
+	 	 	 	�——————————   
+ 	 	 	 	;判断输入格式是否合规的子程序
+ 00BB	 	 	 	INPUTerror  PROC
+ 00BB  BB 001E R	 	 	MOV  BX, OFFSET  TIME+2 ;BX取到数组
+	 	 	 	的首地址 
+ 00BE  B1 00	 	 	 	MOV  CL, 00H            ;开始CL置零
+ 	 	 	 	
+ 00C0  8A 07	 	 	 	MOV AL, [BX]            ;提取BX对应
+	 	 	 	的值
+ 00C2  E8 00DB R	 	 	CALL  NUMerror          ;判断是否�
+	 	 	 	�数字
+ 00C5  43	 	 	 	INC  BX                 ;判断下一�
+	 	 	 	�节
+ 	 	 	 	
+ 00C6  8A 07	 	 	    MOV AL, [BX]            ;提取BX对应的�
+	 	 	 	��
+ 00C8  E8 00DB R	 	 	CALL  NUMerror          ;判断是否�
+	 	 	 	�数字
+ 	 	 	 	
+ 00CB  80 F9 00	 	 	 	CMP CL, 00H             ;CL=0说明格�
+	 	 	 	��正确
+ 00CE  74 0A	 	 	 	JE  RIGHT               ;正确则跳�
+	 	 	 	�
+ 	 	 	 	
+ 00D0	 	 	 	ERR0:	
+ 00D0  BA 0054 R	 	    MOV  DX, OFFSET  ERROR0
+ 00D3  B4 09	 	 	 	MOV  AH, 9
+ 00D5  CD 21	 	 	 	INT  21H                ;在屏幕显�
+	 	 	 	�ERROR0	
+ 00D7  E9 0000 R	 	 	JMP  START              ;跳回开头
+ 00DA	 	 	 	RIGHT:
+ 00DA  C3	 	 	 	RET
+ 00DB	 	 	 	INPUTerror  ENDP
+ 	 	 	 	;———————————————�
+	 	 	 	��——NUMerror子程序———————�
+	 	 	 	��———————————
+ 	 	 	 	;判断数字错误的子程序
+ The Microsoft MACRO Assembler , Version 1.27          	Page	1-5
+	 	 	 	 	 	 	 	05-15-<4    
+
+
+ 00DB	 	 	 	NUMerror PROC
+ 00DB  3C 39	 	 	 	CMP AL, 39H             ;与‘9’比�
+	 	 	 	��	 	 	
+ 00DD  77 05	 	 	 	JA  ERR_num;
+ 00DF  3C 30	 	 	 	CMP  AL, 30H            ;与‘0’比�
+	 	 	 	��	
+ 00E1  72 01	 	 	 	JB  ERR_num;
+ 00E3  C3	 	 	 	RET
+ 00E4	 	 	 	ERR_num:	
+ 00E4  B1 01	 	 	    MOV CL, 01H             ;若不在数字范
+	 	 	 	围，CL置1	
+ 00E6  C3	 	 	 	RET
+ 00E7	 	 	 	NUMerror ENDP
+ 	 	 	 	;———————————————�
+	 	 	 	��——ASCtoNUM子程序———————�
+	 	 	 	��————————————
+ 	 	 	 	;ASC变压缩NUM的子程序
+ 00E7	 	 	 	ASCtoNUM  PROC
+ 00E7  56	 	 	    PUSH SI;
+ 	 	 	 	;转换个位
+ 00E8  BB 001E R	 	 	MOV  BX, OFFSET  TIME+2 ;指针指向�
+	 	 	 	�据区
+ 00EB  BE 0021 R	 	    MOV  SI, OFFSET  T;
+ 00EE  2B C9	 	 	 	SUB  CX,CX;
+ 00F0  8A 4F 01	 	 	 	MOV  CL, [BX+1];
+ 00F3  80 E9 30	 	 	 	SUB  CL, 30H
+ 	 	 	 	;转换十位
+ 00F6  8A 07	 	 	    MOV  AL,[BX];
+ 00F8  2C 30	 	 	    SUB  AL,30H
+ 	 	 	 	;整合相加
+ 00FA  B2 0A	 	 	    MOV  DL,10;
+ 00FC  F6 E2	 	 	    MUL  DL                 ;转换十位
+ 00FE  03 C1	 	 	    ADD  AX,CX              ;整合相加
+ 0100  88 04	 	 	    MOV [SI],AL             ;储存
+ 0102  2B C9	 	 	 	SUB  CX,CX;
+ 0104  8A 0C	 	 	    MOV  CL,[SI]            ;以便VALUEerror�
+	 	 	 	�程序判断
+ 	 	 	 	        
+ 0106  5E	 	 	    POP SI;
+ 0107  C3	 	 	 	RET
+ 0108	 	 	 	ASCtoNUM ENDP
+ 	 	 	 	;———————————————�
+	 	 	 	��——VALUEerror子程序——————�
+	 	 	 	�————————————�
+ 	 	 	 	�—
+ E r r o r   ---	1:Extra characters on line      
+ 	 	 	 	;判断时间符合实际的子程序
+ 0108	 	 	 	VALUEerror  PROC
+ 0108  80 F9 05	 	 	 	CMP  CL, 5D             ;和5比较
+ 010B  72 08	 	 	 	JB   tooSMALL           ;<5则跳转
+ 010D  80 F9 32	 	 	    CMP  CL, 50D            ;和50比较
+ 0110  77 0D	 	 	 	JA   tooBIG             ;>50则跳转
+ 0112  EB 15 90	 	 	 	JMP  GONEXT;
+ The Microsoft MACRO Assembler , Version 1.27          	Page	1-6
+	 	 	 	 	 	 	 	05-15-<4    
+
+
+ 0115	 	 	 	tooSMALL:	
+ 0115  BA 006B R	 	    MOV  DX, OFFSET  ERROR1
+ 0118  B4 09	 	 	 	MOV  AH, 9
+ 011A  CD 21	 	 	 	INT  21H                ;在屏幕显�
+	 	 	 	�ERROR1	 	 
+ 011C  E9 0000 R	 	 	JMP  START              ;跳回开头
+ 011F	 	 	 	tooBIG:
+ 011F  BA 0086 R	 	    MOV  DX, OFFSET  ERROR2
+ 0122  B4 09	 	 	 	MOV  AH, 9
+ 0124  CD 21	 	 	 	INT  21H                ;在屏幕显�
+	 	 	 	�ERROR2	 	 
+ 0126  E9 0000 R	 	 	JMP  START              ;跳回开头
+ 0129	 	 	 	GONEXT:
+ 0129  C3	 	 	 	RET	
+ 012A	 	 	 	VALUEerror ENDP
+ 	 	 	 	;———————————————�
+	 	 	 	��——DISP1子程序————————�
+	 	 	 	��————————————
+ 	 	 	 	��——
+ E r r o r   ---	1:Extra characters on line      
+ 	 	 	 	;显示太阳的子程序
+ 012A	 	 	 	DISP1 PROC FAR
+ 012A  56	 	 	 	PUSH SI
+ 012B  50	 	 	 	PUSH AX
+ 012C  53	 	 	 	PUSH BX
+ 012D  51	 	 	 	PUSH CX
+ 012E  52	 	 	 	PUSH DX
+ 	 	 	 	;BIOS中断调用，屏幕显示
+ 	 	 	 	;读当前显示状态
+ 012F  B4 0F	 	 	 	MOV AH,15 
+ 0131  CD 10	 	 	 	INT 10H
+ 	 	 	 	;设置显示模式40*25黑白
+ 0133  B4 00	 	 	 	MOV AH,0
+ 0135  CD 10	 	 	 	INT 10H
+ 0137  BA 0000	 	 	 	MOV DX,0 ;行号为0，列号为0
+ 013A	 	 	 	REPT:
+ 	 	 	 	;附加任务，LIM2次显示SUN后立即停止
+	 	 	 	返回DOS
+ 013A  80 3E 0019 R 0C	 	 	CMP CLOCK,LIM2;与LIM2比较
+ 013F  72 03	 	 	 	JB 	K1
+ 0141  EB 31 90	 	 	 	JMP D_EXIT1
+ 	 	 	 	;附加任务，LIM1次键盘后立即停止返
+	 	 	 	回DOS
+ 0144	 	 	 	K1:	
+ 0144  80 3E 001A R 0C	 	 	CMP KEYN,LIM1;与LIM1比较
+ 0149  72 03	 	 	 	JB 	K2
+ 014B  EB 27 90	 	 	 	JMP D_EXIT1
+ 014E	 	 	 	K2:	
+ 	 	 	 	;设置光标位置
+ 014E  B4 02	 	 	 	MOV AH,2
+ 0150  CD 10	 	 	 	INT 10H
+ 	 	 	 	;写字符及属性到当前光标位置处
+ 0152  B0 0F	 	 	 	MOV AL,0FH
+ The Microsoft MACRO Assembler , Version 1.27          	Page	1-7
+	 	 	 	 	 	 	 	05-15-<4    
+
+
+ 0154  B9 0001	 	 	 	MOV CX,1
+ 0157  B3 4F	 	 	    MOV BL,01001111B	    ;红底白字
+ 0159  B4 09	 	 	 	MOV AH,9
+ 015B  CD 10	 	 	 	INT 10H
+ 	 	 	 	;延时
+ 015D  E8 020C R	 	 	CALL DELAY
+ 	 	 	 	;清除屏
+ 0160  B0 03	 	 	 	MOV AL, 03              ;设置显示�
+	 	 	 	�式(80*25彩色文本)
+ 0162  B4 00	 	 	    MOV AH, 0       
+ 0164  CD 10	 	 	    INT 10H                 ;清屏
+ 0166  FE C6	 	 	    INC DH                  ;行号+1
+ 0168  80 C2 02	 	 	    ADD DL, 2               ;列号+2
+ 016B  2B DB	 	 	    SUB BX,BX
+ 	 	 	 	;查看是否到了最大行数
+ 016D  BE 001B R	 	    MOV SI, OFFSET  LINE     
+ 0170  3A 34	 	 	    CMP DH, [SI]            ;与LINE比较
+ 0172  72 C6	 	 	    JB REPT    
+ 0174	 	 	 	D_EXIT1:	
+ 0174  5A	 	 	 	POP DX
+ 0175  59	 	 	 	POP CX
+ 0176  5B	 	 	 	POP BX
+ 0177  58	 	 	 	POP AX
+ 0178  5E	 	 	 	POP SI
+ 0179  CB	 	 	 	RET
+ 017A	 	 	 	DISP1 ENDP
+ 	 	 	 	;———————————————�
+	 	 	 	��——DISP2子程序————————�
+	 	 	 	��————————————
+ 	 	 	 	��——————
+ E r r o r   ---	1:Extra characters on line      
+ 	 	 	 	;显示字符串MSG1的子程序
+ 017A	 	 	 	DISP2  PROC   FAR
+ 017A  56	 	 	 	PUSH SI
+ 017B  52	 	 	    PUSH DX
+ 017C  51	 	 	    PUSH CX
+ 017D  53	 	 	    PUSH BX
+ 017E  50	 	 	    PUSH AX
+ 	 	 	 	;读取当前光标位置
+ 017F  B4 03	 	 	    MOV AH, 3
+ 0181  B7 00	 	 	    MOV BH, 0
+ 0183  CD 10	 	 	    INT 10H       
+ 	 	 	 	
+ 0185  FE C2	 	 	    INC DL                  ;列号+1
+ 0187  B4 02	 	 	    MOV AH, 2
+ 0189  CD 10	 	 	    INT 10H                 ;将光标设在下
+	 	 	 	一个位置，避免覆盖原字符
+ 	 	 	 	    
+ 018B  8D 36 0000 R	 	    LEA SI, MSG1            ;将字符串MSG1�
+	 	 	 	�首地址装入SI
+ 018F  C6 04 30	 	 	    MOV BYTE PTR[SI],30H
+ 0192  8A 1E 0019 R	 	    MOV BL,CLOCK
+ 0196  80 3E 0019 R 0A	 	    CMP CLOCK,10
+ The Microsoft MACRO Assembler , Version 1.27          	Page	1-8
+	 	 	 	 	 	 	 	05-15-<4    
+
+
+ 019B  72 06	 	 	 	JB XIAOYU1
+ 019D	 	 	 	DAYU1:   
+ 019D  C6 04 31	 	 	 	MOV BYTE PTR[SI],31H
+ 01A0  80 EB 0A	 	 	    SUB BL,10
+ 01A3	 	 	 	XIAOYU1:    
+ 01A3  8A C3	 	 	    MOV AL,BL
+ 01A5  0C 30	 	 	 	OR  AL,30H
+ 01A7  88 44 01	 	 	 	MOV BYTE PTR[SI+1],AL    
+ 01AA  B9 000C	 	 	    MOV CX, SLENGTH1        ;将字符串MSG1�
+	 	 	 	�长度装入CX
+ 01AD	 	 	 	NEXTC1:
+ 01AD  B3 78	 	 	 	MOV BL,01111000B	    ;白底黑�
+	 	 	 	��
+ 01AF  B4 09	 	 	 	MOV AH,09H
+ 01B1  CD 10	 	 	 	INT 10H
+ 	 	 	 	
+ 01B3  AC	 	 	    LODSB                 
+ 01B4  B4 0E	 	 	    MOV AH, 0EH             ;置AH寄存器为0
+	 	 	 	EH，表示显示字符和属性。 
+ 01B6  BB 0001	 	 	    MOV BX, 1
+ 01B9  CD 10	 	 	    INT 10H
+ 01BB  E2 F0	 	 	    LOOP NEXTC1
+ 	 	 	 	;弹出 
+ 01BD  58	 	 	    POP AX
+ 01BE  5B	 	 	    POP BX
+ 01BF  59	 	 	    POP CX
+ 01C0  5A	 	 	    POP DX
+ 01C1  5E	 	 	    POP SI
+ 01C2  CB	 	 	 	RET
+ 01C3	 	 	 	DISP2    ENDP
+ 	 	 	 	
+ 	 	 	 	;———————————————�
+	 	 	 	��——DISP3子程序————————�
+	 	 	 	��————————————
+ 	 	 	 	��——————
+ E r r o r   ---	1:Extra characters on line      
+ 	 	 	 	;附加任务：显示字符串MSG2的子程序
+ 01C3	 	 	 	DISP3  PROC   FAR
+ 	 	 	 	;压栈 
+ 01C3  56	 	 	    PUSH SI
+ 01C4  52	 	 	    PUSH DX
+ 01C5  51	 	 	    PUSH CX
+ 01C6  53	 	 	    PUSH BX
+ 01C7  50	 	 	    PUSH AX
+ 	 	 	 	;读取当前光标位置
+ 01C8  B4 03	 	 	    MOV AH, 3
+ 01CA  B7 00	 	 	    MOV BH, 0
+ 01CC  CD 10	 	 	    INT 10H       
+ 	 	 	 	
+ 01CE  FE C2	 	 	    INC DL              ;列号+1
+ 01D0  B4 02	 	 	    MOV AH, 2
+ 01D2  CD 10	 	 	    INT 10H             ;将光标设在下一�
+	 	 	 	��位置，避免覆盖原字符
+ The Microsoft MACRO Assembler , Version 1.27          	Page	1-9
+	 	 	 	 	 	 	 	05-15-<4    
+
+
+ 	 	 	 	    
+ 01D4  8D 36 000C R	 	    LEA SI, MSG2        ;将字符串MSG的首�
+	 	 	 	��址装入SI
+ 01D8  C6 04 30	 	 	    MOV BYTE PTR[SI],30H
+ 01DB  8A 1E 001A R	 	    MOV BL,KEYN
+ 	 	 	 	
+ 	 	 	 	    ;附加功能：加入按键次数KEY
+ 01DF  80 3E 001A R 0A	 	    CMP KEYN,10
+ 01E4  72 06	 	 	 	JB XIAOYU2
+ 01E6	 	 	 	DAYU2:   
+ 01E6  C6 04 31	 	 	 	MOV BYTE PTR[SI],31H
+ 01E9  80 EB 0A	 	 	    SUB BL,10
+ 01EC	 	 	 	XIAOYU2:    
+ 01EC  8A C3	 	 	    MOV AL,BL
+ 01EE  0C 30	 	 	 	OR  AL,30H
+ 01F0  88 44 01	 	 	 	MOV BYTE PTR[SI+1],AL    
+ 01F3  B9 000C	 	 	    MOV CX, SLENGTH2    ;将字符串MSG2的长
+	 	 	 	度装入CX
+ 01F6	 	 	 	NEXTC2:
+ 01F6  B3 1E	 	 	 	MOV BL,00011110B	;蓝底黄字
+ 01F8  B4 09	 	 	 	MOV AH,09H
+ 01FA  CD 10	 	 	 	INT 10H
+ 	 	 	 	
+ 01FC  AC	 	 	    LODSB               
+ 01FD  B4 0E	 	 	    MOV AH, 0EH         ;设置 AH 寄存器为
+	 	 	 	 0EH，表示显示字符和属性。 
+ 01FF  BB 0001	 	 	    MOV BX, 1
+ 0202  CD 10	 	 	    INT 10H
+ 0204  E2 F0	 	 	    LOOP NEXTC2
+ 	 	 	 	;弹出 
+ 0206  58	 	 	    POP AX
+ 0207  5B	 	 	    POP BX
+ 0208  59	 	 	    POP CX
+ 0209  5A	 	 	    POP DX
+ 020A  5E	 	 	    POP SI
+ 020B  CB	 	 	 	RET
+ 020C	 	 	 	DISP3    ENDP
+ 	 	 	 	
+ 	 	 	 	;———————————————�
+	 	 	 	��——DELAY子程序————————�
+	 	 	 	��————————————
+ 	 	 	 	��——————
+ E r r o r   ---	1:Extra characters on line      
+ 	 	 	 	;延时1000ms子程序
+ 020C	 	 	 	DELAY	PROC	
+ 	 	 	 	        ;压栈
+ 020C  52	 	 	 	    PUSH DX
+ 020D  51	 	 	 	    PUSH CX
+ 020E  53	 	 	        PUSH BX
+ 020F  50	 	 	 	    PUSH AX
+ 	 	 	 	        ;中断调用延时
+ 0210  B4 2C	 	 	 	    MOV AH, 2CH
+ 0212  CD 21	 	 	 	    INT 21H	        ;DOS调用系�
+ The Microsoft MACRO Assembler , Version 1.27          	Page	1-10
+	 	 	 	 	 	 	 	05-15-<4    
+
+
+	 	 	 	�时间
+ 0214  8A DA	 	 	 	    MOV BL, DL	    ;存储当前秒数
+ 0216  80 C3 32	 	 	 	 	ADD BL, 50
+ 0219  8A FE	 	 	 	 	MOV BH, DH      ;存储当前�
+	 	 	 	�分秒数
+ 021B  80 C7 01	 	 	 	 	ADD BH, 1
+ 021E	 	 	 	DL_BEGIN:
+ 021E  CD 21	 	 	 	    INT 21H	        ;DOS调用系�
+	 	 	 	�时间
+ 0220  3A F7	 	 	 	 	CMP DH, BH	    ;比较当�
+	 	 	 	��秒数与BH
+ 0222  73 02	 	 	 	    JAE DL_END	    ;若大于BH，则�
+	 	 	 	��成延时，退出程序
+ 	 	 	 	 	    ;CMP DL, BL	    ;比较当前百分
+	 	 	 	秒数与BL
+ 	 	 	 	 	    ;JAE DL_END	    ;若大于BL，则�
+	 	 	 	��成延时，退出程序
+ 0224  EB F8	 	 	 	    JMP DL_BEGIN	;反之，则�
+	 	 	 	�续调用系统时间
+ 0226	 	 	 	DL_END:
+ 	 	 	 	        ;弹出
+ 0226  58	 	 	 	    POP AX
+ 0227  5B	 	 	        POP BX
+ 0228  59	 	 	 	    POP CX
+ 0229  5A	 	 	 	    POP DX
+ 022A  C3	 	 	 	    RET
+ 022B	 	 	 	DELAY	ENDP
+ 	 	 	 	;———————————————�
+	 	 	 	��——TIMERINTS子程序———————
+	 	 	 	————————————�
+ 	 	 	 	————
+ E r r o r   ---	1:Extra characters on line      
+ 	 	 	 	;设置计时器中断服务子程序
+ 022B	 	 	 	TIMERINTS PROC FAR
+ 022B  56	 	 	 	PUSH SI
+ 022C  50	 	 	 	PUSH AX
+ 022D  FA	 	 	 	CLI
+ 022E  BE 0022 R	 	    MOV SI,OFFSET N
+ 0231  8A 04	 	 	    MOV AL,[SI]
+ 0233  FE 06 0018 R	 	 	INC COUNT           ;计数器加1
+ 0237  38 06 0018 R	 	 	CMP COUNT,AL        ;定时
+ 023B  75 11	 	 	 	JNE GO1
+ 023D  C6 06 0018 R 00	 	 	MOV COUNT,0         ;清零
+ 0242  BE 0000 R	 	 	MOV SI,OFFSET MSG1
+ 0245  FE 06 0019 R	 	 	INC CLOCK           ;计数器加1
+ 0249  9A 017A ---- R	 	 	CALL FAR PTR DISP2	
+ 024E	 	 	 	GO1:
+ 024E  58	 	 	 	POP AX
+ 024F  5E	 	 	 	POP SI
+ 	 	 	 	 	
+ 0250  FB	 	 	 	STI
+ 0251  CF	 	 	 	IRET
+ 0252	 	 	 	TIMERINTS ENDP
+ The Microsoft MACRO Assembler , Version 1.27          	Page	1-11
+	 	 	 	 	 	 	 	05-15-<4    
+
+
+ 	 	 	 	;———————————————�
+	 	 	 	��——KEYINT子程序————————
+	 	 	 	————————————�
+ 	 	 	 	———————
+ E r r o r   ---	1:Extra characters on line      
+ 	 	 	 	;设置键盘中断服务程序
+ 0252	 	 	 	KEYINT PROC FAR
+ 	 	 	 	;保护现场
+ 0252  56	 	 	 	PUSH SI
+ 0253  52	 	 	 	PUSH DX
+ 0254  53	 	 	 	PUSH BX
+ 0255  50	 	 	 	PUSH AX
+ 	 	 	 	;关中断
+ 0256  FA	 	 	 	CLI
+ 	 	 	 	;读取键盘扫描码
+ 0257  E4 60	 	 	 	IN AL,60H
+ 0259  8A E0	 	 	 	MOV AH,AL
+ 	 	 	 	;输出一个正脉冲
+ 025B  E4 61	 	 	 	IN AL,61H
+ 025D  0C 80	 	 	 	OR AL,80H
+ 025F  E6 61	 	 	 	OUT 61H,AL
+ 0261  24 7F	 	 	 	AND AL,7FH
+ 0263  E6 61	 	 	 	OUT 61H,AL
+ 	 	 	 	;判断：无键按下则执行退出键盘中�
+	 	 	 	��
+ 0265  F6 C4 80	 	 	 	TEST AH,80H
+ 0268  75 09	 	 	 	JNE GO2
+ 	 	 	 	;有键按下则显示MSG2，KEYN同时计数
+ 026A  FE 06 001A R	 	 	INC KEYN            ;计数器加1
+ 026E  9A 01C3 ---- R	 	 	CALL FAR PTR DISP3
+ 0273	 	 	 	GO2:
+ 	 	 	 	;EOI命令
+ 0273  B0 20	 	 	 	MOV AL,20H
+ 0275  E6 20	 	 	 	OUT 20H,AL
+ 	 	 	 	
+ 0277  58	 	 	 	POP AX
+ 0278  5B	 	 	 	POP BX
+ 0279  5A	 	 	 	POP DX
+ 027A  5E	 	 	 	POP SI
+ 027B  FB	 	 	 	STI
+ 027C  CF	 	 	 	IRET
+ 027D	 	 	 	KEYINT ENDP
+ 	 	 	 	
+ 027D	 	 	 	CODE ENDS
+ 	 	 	 	END START
+
+ The Microsoft MACRO Assembler , Version 1.27          	Page	Symbols
+	 	 	 	-1
+	 	 	 	 	 	 	 	05-15-<4    
+
+
+Segments and groups:
+
+	 	N a m e	 	 	Size	align	combine	class
+
+CODE . . . . . . . . . . . . . .	027D	PARA  	NONE	
+DATA . . . . . . . . . . . . . .	009F	PARA  	NONE	
+STACK. . . . . . . . . . . . . .	0600	PARA  	STACK 	
+
+Symbols:            
+
+	 	N a m e	 	 	Type	Value	Attr         
+
+AGAIN. . . . . . . . . . . . . .	L NEAR 	008A	CODE
+ASCTONUM . . . . . . . . . . . .	N PROC	00E7	CODE	Length =0021
+CLOCK. . . . . . . . . . . . . .	L BYTE 	0019	DATA
+COUNT. . . . . . . . . . . . . .	L BYTE 	0018	DATA
+DAYU1. . . . . . . . . . . . . .	L NEAR 	019D	CODE
+DAYU2. . . . . . . . . . . . . .	L NEAR 	01E6	CODE
+DELAY. . . . . . . . . . . . . .	N PROC	020C	CODE	Length =001F
+DISP1. . . . . . . . . . . . . .	F PROC	012A	CODE	Length =0050
+DISP2. . . . . . . . . . . . . .	F PROC	017A	CODE	Length =0049
+DISP3. . . . . . . . . . . . . .	F PROC	01C3	CODE	Length =0049
+DL_BEGIN . . . . . . . . . . . .	L NEAR 	021E	CODE
+DL_END . . . . . . . . . . . . .	L NEAR 	0226	CODE
+D_EXIT1. . . . . . . . . . . . .	L NEAR 	0174	CODE
+ERR0 . . . . . . . . . . . . . .	L NEAR 	00D0	CODE
+ERROR0 . . . . . . . . . . . . .	L BYTE 	0054	DATA
+ERROR1 . . . . . . . . . . . . .	L BYTE 	006B	DATA
+ERROR2 . . . . . . . . . . . . .	L BYTE 	0086	DATA
+ERR_NUM. . . . . . . . . . . . .	L NEAR 	00E4	CODE
+EXIT . . . . . . . . . . . . . .	L NEAR 	00B7	CODE
+GO1. . . . . . . . . . . . . . .	L NEAR 	024E	CODE
+GO2. . . . . . . . . . . . . . .	L NEAR 	0273	CODE
+GONEXT . . . . . . . . . . . . .	L NEAR 	0129	CODE
+INPUTERROR . . . . . . . . . . .	N PROC	00BB	CODE	Length =0020
+K1 . . . . . . . . . . . . . . .	L NEAR 	0144	CODE
+K2 . . . . . . . . . . . . . . .	L NEAR 	014E	CODE
+KEYINT . . . . . . . . . . . . .	F PROC	0252	CODE	Length =002B
+KEYN . . . . . . . . . . . . . .	L BYTE 	001A	DATA
+LIM1 . . . . . . . . . . . . . .	Number	000C	
+LIM2 . . . . . . . . . . . . . .	Number	000C	
+LINE . . . . . . . . . . . . . .	L BYTE 	001B	DATA
+MSG1 . . . . . . . . . . . . . .	L BYTE 	0000	DATA
+MSG2 . . . . . . . . . . . . . .	L BYTE 	000C	DATA
+N. . . . . . . . . . . . . . . .	L BYTE 	0022	DATA
+NEXT . . . . . . . . . . . . . .	L NEAR 	009F	CODE
+NEXTC1 . . . . . . . . . . . . .	L NEAR 	01AD	CODE
+NEXTC2 . . . . . . . . . . . . .	L NEAR 	01F6	CODE
+NUMERROR . . . . . . . . . . . .	N PROC	00DB	CODE	Length =000C
+REPT . . . . . . . . . . . . . .	L NEAR 	013A	CODE
+RIGHT. . . . . . . . . . . . . .	L NEAR 	00DA	CODE
+SLENGTH1 . . . . . . . . . . . .	Number	000C	
+ The Microsoft MACRO Assembler , Version 1.27          	Page	Symbols
+	 	 	 	-2
+	 	 	 	 	 	 	 	05-15-<4    
+
+
+SLENGTH2 . . . . . . . . . . . .	Number	000C	
+START. . . . . . . . . . . . . .	L NEAR 	0000	CODE
+T. . . . . . . . . . . . . . . .	L BYTE 	0021	DATA
+TIME . . . . . . . . . . . . . .	L BYTE 	001C	DATA
+TIMERINTS. . . . . . . . . . . .	F PROC	022B	CODE	Length =0027
+TOOBIG . . . . . . . . . . . . .	L NEAR 	011F	CODE
+TOOSMALL . . . . . . . . . . . .	L NEAR 	0115	CODE
+TXT1 . . . . . . . . . . . . . .	L BYTE 	0023	DATA
+VALUEERROR . . . . . . . . . . .	N PROC	0108	CODE	Length =0022
+XIAOYU1. . . . . . . . . . . . .	L NEAR 	01A3	CODE
+XIAOYU2. . . . . . . . . . . . .	L NEAR 	01EC	CODE
+
+Warning Severe
+Errors	Errors 
+7	0

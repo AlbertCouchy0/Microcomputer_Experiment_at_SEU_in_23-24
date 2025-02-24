@@ -1,0 +1,159 @@
+DATA    SEGMENT                                     ;定义数据段
+SHOWM 	DB  0AH,0DH, 'PLEASE PLAY THE VIRTUAL PIANO:$'         ;0AH,0DH为换行，回车
+SHOWN	DB  0AH,0DH,'PRESS KEY O TO END THE PIANO$'
+FREQ 	DW  131,147,165,175,196,220,247	;查表可得频率
+        DW  262,294,330,349,392,440,494
+        DW  524,588,660,698,784,880,988
+ISPLAY 	DB 1
+ISBREAK	DB 0
+DATA    ENDS
+STACK   SEGMENT PARA STACK 'STACK'                    ;定义堆栈段
+        DW  200 DUP(?)
+STACK   ENDS
+
+CODE    SEGMENT
+	ASSUME  CS:CODE, DS:DATA,SS:STACK
+
+START:
+	MOV 	AX,DATA
+	MOV 	DS,AX
+	MOV 	AX,STACK
+	MOV 	SS,AX
+	MOV 	DX,OFFSET SHOWM
+	MOV 	AH,09H			;显示文字
+	INT 	21H
+	MOV 	DX,OFFSET SHOWN		;显示文字
+	INT 	21H
+    
+	MOV 	AL,9
+	MOV 	AH,35H		;通过DOS功能读取中断
+	INT 	21H
+	MOV 	AX,BX
+	PUSH 	AX
+	MOV 	AX,ES
+	PUSH 	AX
+	CLI
+	MOV 	DX,OFFSET KEYINT
+	MOV 	AX,SEG KEYINT
+	MOV 	BX,DS
+	MOV 	DS,AX
+	MOV 	AL,9
+	MOV 	AH,25H		;通过DOS功能设置中断
+	INT 	21H
+	MOV 	DS,BX
+	STI
+	LEA	BX,FREQ
+AGAIN:	
+	CMP ISBREAK,0
+	JE	AGAIN
+	CLI
+
+	POP 	AX
+	MOV 	BX,DS
+	MOV 	DS,AX
+	POP 	AX
+	MOV 	DX,AX
+	MOV 	AL,9
+	MOV 	AH,25H		;通过DOS功能设置中断
+	INT 	21H
+	MOV 	DS,BX
+	STI
+	MOV 	AH,4CH		;结束程序返回DOS
+	INT 	21H
+
+KEYINT PROC			;构造新的中断应用子程序
+	STI			;开中断
+	PUSH 	AX		;保护入栈
+	PUSH 	BX
+	PUSH	SI
+	IN 	AL,60H
+
+	CMP	AL,80H		;如果是释放按键，高位为1，不发声
+	JAE	GO
+
+	CMP 	AL,18H		;如果按到O，电子琴程序结束
+	JE 	BREAK
+
+	CMP 	AL,10H		;判断是否按在可以发声的按键
+	JB 	GO			
+	CMP 	AL,17H
+	JAE 	JUDGE1		;跳转判断是否在中音区
+	MOV 	AH,0
+	SUB 	AL,10H
+	ADD 	AL,AL
+	MOV 	SI,AX
+	MOV 	ISPLAY,1		;表示发出声音
+	CALL 	SOUND
+	JMP 	GO2
+JUDGE1:
+	CMP 	AL,1EH		;判断是否在中音区
+	JB 	GO		;不在发声按键直接结束
+	CMP 	AL,25H		;判断时候在中音区
+	JAE 	JUDGE2		;跳转判断是否在高音区
+	MOV 	AH,0
+	SUB 	AL,17H		
+	ADD 	AL,AL		;此时AX存相对变址
+	MOV 	SI,AX		;把AX传给SI
+	MOV	ISPLAY,1
+	CALL 	SOUND
+	JMP 	GO2
+JUDGE2:
+	CMP 	AL,2CH		;判断是否在高音区
+	JB 	GO		;不在发声按键直接结束
+	CMP 	AL,33H		;判断是否在高音区
+	JAE 	GO
+	MOV 	AH,0
+	SUB 	AL,1EH
+	ADD 	AL,AL		
+	MOV 	SI,AX		;把AX传给SI
+	MOV 	ISPLAY,1
+	CALL 	SOUND
+	JMP 	GO2
+BREAK:
+	MOV 	ISBREAK,1
+	JMP 	GO2
+GO:	
+	MOV	ISPLAY,0
+	CALL	SOUND
+GO2:	
+	IN	AL,61H
+	OR	AL,80H		;将PB7置为1
+	OUT	61H,AL
+	AND 	AL,7FH		;将PB7清0
+	OUT	61H,AL
+	MOV 	AL,20H
+	OUT 	20H,AL		;中断结束，复位
+	POP 	SI
+	POP	BX
+	POP 	AX	
+	IRET
+KEYINT	ENDP
+
+SOUND	PROC NEAR
+	PUSH	AX
+	PUSH	BX
+	PUSH	DX
+	PUSH	DI		;入口参数DI给定频率数据
+	MOV	DI,[BX+SI]
+	MOV	AL,0B6H		;8253初始化（通道2，方式3，产生方波信号）
+	OUT	43H,AL		;43H端口是8253的命令寄存器
+	MOV	DX,12H		;计算时间常数
+	MOV 	AX,34DCH
+	DIV 	DI
+	OUT	42H,AL		;给8253通道2设置计数初值
+	MOV	AL,AH
+	OUT	42H,AL
+	AND	AL,0FCH		;8255PB1PB0置0，关喇叭
+	OUT	61H,AL
+	CMP	ISPLAY,0
+	JE	NOO
+	OR	AL,3
+	OUT	61H,AL
+NOO:	POP	DI
+	POP	DX
+	POP	BX
+	POP	AX
+	RET
+SOUND	ENDP
+CODE	ENDS
+	END START

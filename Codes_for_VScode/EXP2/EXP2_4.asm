@@ -1,0 +1,13 @@
+CODE	SEGMENT
+		ASSUME CS:CODE
+START:	
+		MOV AL,DS:[0000H]
+        MOV CL,2
+        SHR AL,CL
+        MUL BYTE PTR DS:[0001H]
+        MOV DS:[0002H],AX
+
+
+CODE	ENDS
+		END START
+

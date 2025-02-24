@@ -1,0 +1,276 @@
+ The Microsoft MACRO Assembler , Version 1.27          	Page	1-1
+	 	 	 	 	 	 	 	04-29-<4    
+
+
+ 0000	 	 	 	STACK   SEGMENT
+ 0000  0200 [	 	 	        STK  DW 200H DUP(?)
+                ????	 	
+                      ]	 	
+ 	 	 	 	
+ 0400	 	 	 	STACK   ENDS            ;堆栈段定义
+ 	 	 	 	
+ 0000	 	 	 	DATA    SEGMENT
+ 0000  00	 	 	        KEY   DB 0      ;存储按下键盘的�
+	 	 	 	��数，初值为0
+ 0001  4F 4B 21	 	 	        MSG   DB "OK!"  ;存储按下键盘后�
+	 	 	 	��提示信息
+ = 0003	 	 	 	        LENGTH EQU $-MSG ;提示字符长度
+ 0004	 	 	 	DATA    ENDS
+ 	 	 	 	
+ 0000	 	 	 	CODE    SEGMENT
+ 	 	 	 	        ASSUME CS:CODE, SS:STACK, DS:DATA
+ 0000	 	 	 	START: 
+ 0000  B8 ---- R	 	        MOV AX, STACK
+ 0003  8E D0	 	 	        MOV SS, AX
+ 0005  B8 ---- R	 	        MOV AX, DATA
+ 0008  8E D8	 	 	        MOV DS, AX
+ 	 	 	 	        ;保存原09H中断内容
+ 000A  B8 0000	 	 	        MOV AX, 0
+ 000D  8E C0	 	 	        MOV ES, AX      ;ES用来存放中断�
+	 	 	 	�量表的段地址(物理地址：00000H)
+ 000F  26: A1 0024	 	        MOV AX, ES:[24H];获取09H中断偏移�
+	 	 	 	��址，[24H]即为00036D,是为09H在中断向
+	 	 	 	量表的首地址
+ 0013  50	 	 	        PUSH AX
+ 0014  26: A1 0026	 	        MOV AX, ES:[26H];获取09H中断段地�
+	 	 	 	��
+ 0018  50	 	 	        PUSH AX 
+ 	 	 	 	        ;存入新中断内容KEYINTS
+ 0019  FA	 	 	        CLI             ;屏蔽外部中断，�
+	 	 	 	��止可能受到的干扰
+ 001A  B8 0045 R	 	        MOV AX, OFFSET KEYINTS
+ 001D  26: A3 0024	 	        MOV ES:[24H], AX
+ 0021  B8 ---- R	 	        MOV AX, SEG KEYINTS
+ 0024  26: A3 0026	 	        MOV ES:[26H], AX    
+ 0028  FB	 	 	        STI             ;存完后打开外部�
+	 	 	 	��断屏蔽
+ 0029	 	 	 	AGAIN:  
+ 0029  9A 0083 ---- R	 	        CALL FAR PTR SHOW1  ;显示一轮太阳
+	 	 	 	图形
+ 002E  80 3E 0000 R 0A	 	        CMP KEY, 10     ;判断按键是否按�
+	 	 	 	��10次
+ 0033  72 F4	 	 	        JB AGAIN        ;键盘未按下十次�
+	 	 	 	��则继续下一轮显示太阳图形
+ 	 	 	 	        ;若按下了十次，进行处理
+ 0035  FA	 	 	        CLI             ;屏蔽外部中断，�
+	 	 	 	��备将原有中断向量恢复到中断向量
+	 	 	 	表中
+ The Microsoft MACRO Assembler , Version 1.27          	Page	1-2
+	 	 	 	 	 	 	 	04-29-<4    
+
+
+ 0036  58	 	 	        POP AX
+ 0037  26: A3 0026	 	        MOV ES:[26H], AX
+ 003B  58	 	 	        POP AX
+ 003C  26: A3 0024	 	        MOV ES:[24H], AX
+ 0040  FB	 	 	        STI             ;打开外部中断
+ 	 	 	 	
+ 0041  B4 4C	 	 	        MOV AH, 4CH
+ 0043  CD 21	 	 	        INT 21H         ;返回DOS
+ 	 	 	 	
+ 	 	 	 	;键盘中断子程序
+ 0045	 	 	 	KEYINTS  PROC FAR
+ 0045  50	 	 	        PUSH AX
+ 0046  56	 	 	        PUSH SI
+ 0047  FB	 	 	        STI             ;在子程序内打开�
+	 	 	 	��部中断
+ 0048  E4 60	 	 	        IN  AL, 60H     ;通过8255A的PA口(PA
+	 	 	 	口地址为60H)读取键盘扫描码
+ 004A  8A E0	 	 	        MOV AH, AL      ;从8255A的PA口读入
+	 	 	 	键盘扫描码，将其存入AH
+ 004C  E4 61	 	 	        IN  AL, 61H     ;读入PB口的当前�
+	 	 	 	�
+ 	 	 	 	        ;完成在PB（7）口的一次正脉�
+	 	 	 	�输出，以通知键盘控制器已经处理�
+	 	 	 	��中断。
+ 004E  0C 80	 	 	        OR  AL, 80H     ;PB（7）置1
+ 0050  E6 61	 	 	        OUT 61H, AL
+ 0052  24 7F	 	 	        AND AL, 7FH     ;PB（7）置0，
+ 0054  E6 61	 	 	        OUT 61H, AL
+ 	 	 	 	
+ 0056  F6 C4 80	 	 	        TEST AH, 80H    ;检测键盘扫描码�
+	 	 	 	��最高位是否为1
+ 0059  75 0A	 	 	        JNZ GO          ;若最高位为1，说
+	 	 	 	明此时键盘释放，跳转到子程序出�
+	 	 	 	�处
+ 005B  FB	 	 	        STI
+ 005C  FE 06 0000 R	 	        INC KEY         ;若最高位为0，说
+	 	 	 	明此时键盘按下，给计数器加一
+ 0060  9A 00C1 ---- R	 	        CALL FAR PTR SHOW2  ;并显示提示信
+	 	 	 	息
+ 0065	 	 	 	GO:
+ 0065  B0 20	 	 	        MOV AL, 20H
+ 0067  E6 20	 	 	        OUT 20H, AL     ;给8259A的OCW1发出�
+	 	 	 	��示中断结束的EOI命令
+ 0069  5E	 	 	        POP SI
+ 006A  58	 	 	        POP AX
+ 006B  CF	 	 	        IRET
+ 006C	 	 	 	KEYINTS  ENDP
+ 	 	 	 	
+ 	 	 	 	;延时1s子程序
+ 006C	 	 	 	DELAYS	PROC	
+ 	 	 	 	        ;压栈
+ 006C  52	 	 	 	PUSH DX
+ 006D  51	 	 	 	PUSH CX
+ The Microsoft MACRO Assembler , Version 1.27          	Page	1-3
+	 	 	 	 	 	 	 	04-29-<4    
+
+
+ 006E  53	 	 	        PUSH BX
+ 006F  50	 	 	 	PUSH AX
+ 	 	 	 	        ;中断调用延时
+ 0070  B4 2C	 	 	 	MOV AH, 2CH
+ 0072  CD 21	 	 	 	INT 21H	        ;DOS调用系统时间
+ 0074  8A FE	 	 	 	MOV BH, DH	;存储当前秒数
+ 0076	 	 	 	BEGIN:
+ 0076  CD 21	 	 	 	INT 21H	        ;调用系统时间
+ 0078  3A FE	 	 	 	CMP BH, DH	;比较当前时间与�
+	 	 	 	��次调用的时间是否变化
+ 007A  75 02	 	 	 	JNE NEXT	;若有变化，则完�
+	 	 	 	��延时，退出程序
+ 007C  EB F8	 	 	 	JMP BEGIN	;若无变化，则继�
+	 	 	 	��调用系统时间
+ 007E	 	 	 	NEXT:
+ 	 	 	 	        ;弹出
+ 007E  58	 	 	 	POP AX
+ 007F  5B	 	 	        POP BX
+ 0080  59	 	 	 	POP CX
+ 0081  5A	 	 	 	POP DX
+ 0082  C3	 	 	 	RET
+ 0083	 	 	 	DELAYS	ENDP
+ 	 	 	 	
+ 	 	 	 	;显示太阳图形的子程序
+ 0083	 	 	 	SHOW1   PROC FAR   
+ 	 	 	 	        ;压栈 
+ 0083  50	 	 	        PUSH AX
+ 0084  53	 	 	        PUSH BX
+ 0085  51	 	 	        PUSH CX
+ 0086  52	 	 	        PUSH DX
+ 	 	 	 	        ;每轮显示太阳        
+ 0087  B4 0F	 	 	        MOV AH, 15  
+ 0089  CD 10	 	 	        INT 10H      ;读取当前显示状态
+ 008B  B4 00	 	 	        MOV AH, 0
+ 008D  CD 10	 	 	        INT 10H      ;设置显示方式
+ 008F  B9 0001	 	 	        MOV CX, 1    ;要显示的字符数
+ 0092  BA 0000	 	 	        MOV DX, 0    ;设置光标起始位置�
+	 	 	 	��行号为0，列号为0
+ 0095	 	 	 	REPEAT:
+ 0095  80 3E 0000 R 0A	 	        CMP KEY, 10
+ 009A  73 20	 	 	        JAE EXIT     ;若KEY达到10，转至EX
+	 	 	 	IT
+ 	 	 	 	        ;KEY小于10的情况
+ 009C  B4 02	 	 	        MOV AH, 2    
+ 009E  CD 10	 	 	        INT 10H      ;设置光标位置
+ 00A0  B0 0F	 	 	        MOV AL, 0FH  ;太阳图形的ASCII码
+ 00A2  B9 0001	 	 	        MOV CX, 1    ;要显示的字符数
+ 00A5  B4 0A	 	 	        MOV AH, 10   
+ 00A7  CD 10	 	 	        INT 10H      ;显示单个太阳图形
+ 00A9  E8 006C R	 	        CALL DELAYS  ;延时一秒
+ 00AC  2A C0	 	 	        SUB AL, AL
+ 00AE  B4 06	 	 	        MOV AH, 6       
+ 00B0  CD 10	 	 	        INT 10H      ;清屏
+ The Microsoft MACRO Assembler , Version 1.27          	Page	1-4
+	 	 	 	 	 	 	 	04-29-<4    
+
+
+ 00B2  FE C6	 	 	        INC DH       ;行号+1
+ 00B4  80 C2 02	 	 	        ADD DL, 2    ;列号+2
+ 00B7  80 FE 19	 	 	        CMP DH, 25    
+ 00BA  72 D9	 	 	        JB REPEAT    ;如果没到25行，则�
+	 	 	 	�转到REPEAT更新光标位置；到了25行�
+	 	 	 	�退出子程序
+ 00BC	 	 	 	EXIT:
+ 	 	 	 	        ;弹出
+ 00BC  5A	 	 	        POP DX
+ 00BD  59	 	 	        POP CX
+ 00BE  5B	 	 	        POP BX
+ 00BF  58	 	 	        POP AX
+ 00C0  CB	 	 	        RET
+ 00C1	 	 	 	SHOW1   ENDP
+ 	 	 	 	
+ 	 	 	 	;显示提示信息的子程序
+ 00C1	 	 	 	SHOW2   PROC FAR    
+ 	 	 	 	        ;压栈 
+ 00C1  56	 	 	        PUSH SI
+ 00C2  52	 	 	        PUSH DX
+ 00C3  51	 	 	        PUSH CX
+ 00C4  53	 	 	        PUSH BX
+ 00C5  50	 	 	        PUSH AX
+ 	 	 	 	
+ 00C6  8D 36 0001 R	 	        LEA SI, MSG   ;将字符串MSG的首地
+	 	 	 	址装入SI
+ 	 	 	 	        ;读取当前光标位置
+ 00CA  B4 03	 	 	        MOV AH, 3
+ 00CC  B7 00	 	 	        MOV BH, 0
+ 00CE  CD 10	 	 	        INT 10H       
+ 	 	 	 	
+ 00D0  FE C2	 	 	        INC DL          ;列号+1
+ 00D2  B4 02	 	 	        MOV AH, 2
+ 00D4  CD 10	 	 	        INT 10H         ;将光标设在下一�
+	 	 	 	��位置，避免覆盖原字符
+ 00D6  B9 0000	 	 	        MOV CX, LENGTH  ;将字符串MSG的长�
+	 	 	 	��装入CX
+ E r r o r   ---	27:Operand was expected          
+ 00D9	 	 	 	NEXTC:
+ 00D9  AC	 	 	        LODSB           ;从内存中的SI指�
+	 	 	 	�的位置读取一个字节，并将其存入A
+	 	 	 	L寄存器，同时SI寄存器递增�
+ 	 	 	 	
+ 00DA  B4 0E	 	 	        MOV AH, 0EH     ;设置 AH 寄存器为
+	 	 	 	 0EH，表示显示字符和属性。 
+ 00DC  BB 0001	 	 	        MOV BX, 1
+ 00DF  CD 10	 	 	        INT 10H
+ 00E1  E2 F6	 	 	        LOOP NEXTC
+ 	 	 	 	        ;弹出 
+ 00E3  58	 	 	        POP AX
+ 00E4  5B	 	 	        POP BX
+ 00E5  59	 	 	        POP CX
+ 00E6  5A	 	 	        POP DX
+ The Microsoft MACRO Assembler , Version 1.27          	Page	1-5
+	 	 	 	 	 	 	 	04-29-<4    
+
+
+ 00E7  5E	 	 	        POP SI
+ 00E8  CB	 	 	        RET
+ 00E9	 	 	 	SHOW2   ENDP
+ 	 	 	 	
+ 00E9	 	 	 	CODE    ENDS
+ 	 	 	 	        END START
+
+ The Microsoft MACRO Assembler , Version 1.27          	Page	Symbols
+	 	 	 	-1
+	 	 	 	 	 	 	 	04-29-<4    
+
+
+Segments and groups:
+
+	 	N a m e	 	 	Size	align	combine	class
+
+CODE . . . . . . . . . . . . . .	00E9	PARA  	NONE	
+DATA . . . . . . . . . . . . . .	0004	PARA  	NONE	
+STACK. . . . . . . . . . . . . .	0400	PARA  	NONE	
+
+Symbols:            
+
+	 	N a m e	 	 	Type	Value	Attr         
+
+AGAIN. . . . . . . . . . . . . .	L NEAR 	0029	CODE
+BEGIN. . . . . . . . . . . . . .	L NEAR 	0076	CODE
+DELAYS . . . . . . . . . . . . .	N PROC	006C	CODE	Length =0017
+EXIT . . . . . . . . . . . . . .	L NEAR 	00BC	CODE
+GO . . . . . . . . . . . . . . .	L NEAR 	0065	CODE
+KEY. . . . . . . . . . . . . . .	L BYTE 	0000	DATA
+KEYINTS. . . . . . . . . . . . .	F PROC	0045	CODE	Length =0027
+LENGTH . . . . . . . . . . . . .	Number	0003	
+MSG. . . . . . . . . . . . . . .	L BYTE 	0001	DATA
+NEXT . . . . . . . . . . . . . .	L NEAR 	007E	CODE
+NEXTC. . . . . . . . . . . . . .	L NEAR 	00D9	CODE
+REPEAT . . . . . . . . . . . . .	L NEAR 	0095	CODE
+SHOW1. . . . . . . . . . . . . .	F PROC	0083	CODE	Length =003E
+SHOW2. . . . . . . . . . . . . .	F PROC	00C1	CODE	Length =0028
+START. . . . . . . . . . . . . .	L NEAR 	0000	CODE
+STK. . . . . . . . . . . . . . .	L WORD 	0000	STACK	Length =0200
+
+Warning Severe
+Errors	Errors 
+0	1

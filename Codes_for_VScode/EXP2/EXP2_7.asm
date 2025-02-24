@@ -1,0 +1,15 @@
+CODE	SEGMENT
+		ASSUME CS:CODE
+START:	
+        MOV CX,DI
+        MOV AX,SI
+	MOV BX,FFFFH
+        IMUL BX
+        ADD AX,CX
+        MOV CX,0100D
+        IDIV CX
+
+
+CODE	ENDS
+		END START
+
